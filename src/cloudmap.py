@@ -51,7 +51,7 @@ class Root:
             return ""
         key = self.get_cloud_region_variable_key(cloud_provider)
         try:
-            return gitlab_instance.projects.get(project_id).variables.get(key)
+            return gitlab_instance.projects.get(project_id).variables.get(key).value
         except gitlab.exceptions.GitlabGetError:
             # Variable doesn't exist
             return ""
@@ -244,7 +244,7 @@ class Resource:
         }
 
 
-def handle(dashboard_url):
+def handle(dashboard_url, root=None):
     from unfurl.init import clone
     clone_location = "dashboard"
 
@@ -258,7 +258,10 @@ def handle(dashboard_url):
 
     with open(f'{clone_location}/environments.json', 'r') as f:
         environments = json.load(f)
-    root = Root()
+
+    if root is None:
+        root = Root()
+
     for name, environment in environments['DeploymentEnvironment'].items():
         if 'primary_provider' not in environment['connections']:
             # TODO: handle k8s
@@ -267,6 +270,10 @@ def handle(dashboard_url):
         provider = environment['connections']['primary_provider']['type'].split('.')[-1]
         cloud = Cloud(provider)
         root.add_cloud(cloud, name)
+    
+    if 'DeploymentPath' not in environments:
+        print(f"Finishing {dashboard_url}, no deployments found")
+        return root
 
     for path, deployment in environments['DeploymentPath'].items():
         # deployment_name = deployment['name']
@@ -340,6 +347,12 @@ def handle(dashboard_url):
 
     return root
 
+def handle_group(group_name):
+    root = Root()
+    for project in gitlab_instance.groups.list(search=group_name)[0].projects.list():
+        root = handle(project.http_url_to_repo, root=root)
+    return root
+
 ###############################################################################################
 def main():
     # JSON encoding for custom objects
@@ -352,4 +365,5 @@ def main():
         json.dump(root.to_json(), f, default=default, indent=2)
 
 if __name__ == "__main__":
-    main()
+    # main()
+    handle_group("Testbed")
