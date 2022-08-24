@@ -11,6 +11,7 @@ load_dotenv()
 
 OC_TOKEN = os.getenv('OC_TOKEN')
 OC_HOST = os.getenv('OC_HOST')
+OC_USER = os.getenv('OC_USER')
 gitlab_instance = gitlab.Gitlab(OC_HOST, private_token=OC_TOKEN)
 
 
@@ -159,11 +160,8 @@ class Account:
         owner = project['owner']
         self.name = owner['username']
 
-        owner_id = owner['id']
-        owner_object = gitlab_instance.users.get(owner_id)
-        dashboard_project = owner_object.projects.list(search="dashboard")[0]
         # If the avatar is not set, use the default avatar
-        self.avatarUrl = dashboard_project.asdict()['avatar_url'] or "https://app.dev.unfurl.cloud/assets/uf-avatar-placeholder-2-0483fbc376bd429dfd21d89a6b14e7fff0895fff8249d940d4434abb2bd9d163.svg"
+        self.avatarUrl = project['avatar_url'] or "https://app.dev.unfurl.cloud/assets/uf-avatar-placeholder-2-0483fbc376bd429dfd21d89a6b14e7fff0895fff8249d940d4434abb2bd9d163.svg"
 
         return True
 
@@ -254,8 +252,9 @@ def handle(dashboard_url):
         shutil.rmtree(clone_location)
     except FileNotFoundError:
         pass
-
-    clone(dashboard_url, clone_location)
+    
+    src_url = f"https://{OC_USER}:{OC_TOKEN}@{dashboard_url.lstrip('https://')}"
+    clone(src_url, clone_location)
 
     with open(f'{clone_location}/environments.json', 'r') as f:
         environments = json.load(f)
@@ -344,7 +343,10 @@ def handle(dashboard_url):
 ###############################################################################################
 def main():
     # JSON encoding for custom objects
-
+    def default(o):
+        if hasattr(o, 'to_json'):
+            return o.to_json()
+        raise TypeError(f'Object of type {o.__class__.__name__} is not JSON serializable')
     root = handle('https://app.dev.unfurl.cloud/a10/dashboard')
     with open('result-a10.json', 'w') as f:
         json.dump(root.to_json(), f, default=default, indent=2)
