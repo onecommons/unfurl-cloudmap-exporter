@@ -5,7 +5,9 @@ from urllib.parse import unquote
 
 from dotenv import load_dotenv
 import gitlab
-import uvicorn
+
+from applications import Blueprint
+from resources import ResourceIconMap
 
 load_dotenv()
 
@@ -109,7 +111,7 @@ class Cloud:
     def to_json(self):
         return {
             "cloud": self.cloud,
-            "cloudIcon": self.cloud_icon,
+            "icon": self.cloud_icon,
             "type": self.type,
             "children": list(self.regions.values()),
         }
@@ -177,7 +179,7 @@ class Account:
             "name": self.name,
             "type": self.type,
             "cloud": self.cloud,
-            "avatarUrl": self.avatarUrl,
+            "icon": self.avatarUrl,
             "children": list(self.deployments.values()),
         }
 
@@ -190,11 +192,12 @@ class Deployment:
     cloud: str
     resources: dict[str, "Resource"]
 
-    def __init__(self, name: str, id: int, template_name: str, cloud: "Cloud") -> None:
+    def __init__(self, name: str, id: int, template_name: str, cloud: "Cloud", deployment_ensemble) -> None:
         self.resources = {}
         self.name = name
         self.id = id
-        self.app_icon = self.get_app_icon(template_name)
+        self.deployment_ensemble = deployment_ensemble
+        self.app_icon = self.get_app_icon()
         self.cloud = cloud
 
     def add_resource(self, resource: "Resource") -> None:
@@ -204,14 +207,15 @@ class Deployment:
             self.resources[resource.name] = resource
             return True
 
-    def get_app_icon(self, template_name):
-        return "data:image/svg,"
+    def get_app_icon(self):
+        blueprint = Blueprint(self.deployment_ensemble)
+        return blueprint.icon or ""
 
     def to_json(self):
         return {
             "name": self.name,
             "id": self.id,
-            "appIcon": self.app_icon,
+            "icon": self.app_icon,
             "type": self.type,
             "cloud": self.cloud,
             "children": list(self.resources.values()),
@@ -220,26 +224,30 @@ class Deployment:
 
 class Resource:
     name: str
-    tooltip: str
     resourceType: str
     connection: int
     cloud: str
+    icon: str
     value: int = 2
 
     def __init__(self, name: str, resourceType: str, cloud: str) -> None:
         self.name = name
-        self.tooltip = f"<h1>{self.name}</h1>"
         self.resourceType = resourceType
+        self.icon = self.get_icon()
         self.connection = None
         self.cloud = cloud
+    
+    def get_icon(self):
+        resource_map = ResourceIconMap.fetch_from_unfurl_types()
+        return resource_map.get(self.resourceType) or ""
 
     def to_json(self):
         return {
             "name": self.name,
-            "tooltip": self.tooltip,
             "resourceType": self.resourceType,
             "connection": self.connection,
             "cloud": self.cloud,
+            "icon": self.icon,
             "value": self.value,
         }
 
@@ -304,7 +312,7 @@ def handle(dashboard_url, root=None):
         deployment_name = list(deployment_ensemble['DeploymentTemplate'].keys())[0]
         deployment_template = deployment_ensemble['DeploymentTemplate'][deployment_name]
         template_name = deployment_template['title']
-        app = Deployment(deployment_name, project_id, template_name, cloud_provider)
+        app = Deployment(deployment_name, project_id, template_name, cloud_provider, deployment_ensemble)
 
         (root
             .clouds[cloud_provider]
@@ -365,5 +373,5 @@ def main():
         json.dump(root.to_json(), f, default=default, indent=2)
 
 if __name__ == "__main__":
-    # main()
-    handle_group("Testbed")
+    main()
+    # handle_group("Testbed")

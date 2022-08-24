@@ -1,7 +1,7 @@
 import os
 import json
 import gitlab
-import IPython
+# import IPython
 
 OC_HOST = os.getenv('OC_HOST') or 'https://app.dev.unfurl.cloud'
 

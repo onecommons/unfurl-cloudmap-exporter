@@ -4,7 +4,7 @@ from urllib.parse import unquote
 from flask import Flask, jsonify, request
 import uvicorn
 
-from .cloudmap import handle, handle_group
+from cloudmap import handle, handle_group
 
 app = Flask(__name__)
 
