@@ -11,17 +11,19 @@ from resources import ResourceIconMap
 
 load_dotenv()
 
+from typing import Dict
+
 OC_TOKEN = os.getenv('OC_TOKEN')
 OC_HOST = os.getenv('OC_HOST')
-OC_USER = os.getenv('OC_USER')
+OC_USER = os.getenv('OC_USER') or OC_TOKEN
 gitlab_instance = gitlab.Gitlab(OC_HOST, private_token=OC_TOKEN)
 
 
 class Root:
     name: str
     #  {provider: Cloud}
-    clouds: dict[str, "Cloud"]
-    environment_providers: dict[str, str] = {}
+    clouds: Dict[str, "Cloud"]
+    environment_providers: Dict[str, str] = {}
 
     def __init__(self):
         self.name = ""
@@ -77,7 +79,7 @@ class Cloud:
     cloud: str
     cloud_icon: str
     type: str = "cloudProvider"
-    regions: dict[str, "Region"]
+    regions: Dict[str, "Region"]
 
     def __init__(self, cloud_provider: str) -> None:
         self.regions = {}
@@ -121,7 +123,7 @@ class Region:
     name: str
     type: str = "region"
     cloud: str
-    accounts: dict[str, "Account"]
+    accounts: Dict[str, "Account"]
 
     def __init__(self, name: str, cloud: str) -> None:
         self.accounts = {}
@@ -149,7 +151,7 @@ class Account:
     type: str = "Account"
     cloud: str
     avatarUrl: str
-    deployments: dict[str, "Deployment"]
+    deployments: Dict[str, "Deployment"]
 
     # Initialize from project id
     def __init__(self, cloud: str, project_id: int) -> None:
@@ -186,16 +188,18 @@ class Account:
 
 class Deployment:
     name: str
-    id: int
+    deploy_path: str
+    dashboard_url: str
     app_icon: str
     type: str = "app"
     cloud: str
-    resources: dict[str, "Resource"]
+    resources: Dict[str, "Resource"]
 
-    def __init__(self, name: str, id: int, template_name: str, cloud: "Cloud", deployment_ensemble) -> None:
+    def __init__(self, name: str, dashboard_url: str, deploy_path: str, template_name: str, cloud: "Cloud", deployment_ensemble) -> None:
         self.resources = {}
         self.name = name
-        self.id = id
+        self.dashboard_url = dashboard_url
+        self.deploy_path = deploy_path
         self.deployment_ensemble = deployment_ensemble
         self.app_icon = self.get_app_icon()
         self.cloud = cloud
@@ -214,7 +218,8 @@ class Deployment:
     def to_json(self):
         return {
             "name": self.name,
-            "id": self.id,
+            "deploy_path": self.deploy_path,
+            "dashboard_url": self.dashboard_url,
             "icon": self.app_icon,
             "type": self.type,
             "cloud": self.cloud,
@@ -312,7 +317,7 @@ def handle(dashboard_url, root=None):
         deployment_name = list(deployment_ensemble['DeploymentTemplate'].keys())[0]
         deployment_template = deployment_ensemble['DeploymentTemplate'][deployment_name]
         template_name = deployment_template['title']
-        app = Deployment(deployment_name, project_id, template_name, cloud_provider, deployment_ensemble)
+        app = Deployment(deployment_name, dashboard_url, path, template_name, cloud_provider, deployment_ensemble)
 
         (root
             .clouds[cloud_provider]
