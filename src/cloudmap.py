@@ -55,17 +55,14 @@ class Root:
             return ""
         key = self.get_cloud_region_variable_key(cloud_provider)
         try:
-            return gitlab_instance.projects.get(project_id).variables.get(key).value
-        except gitlab.exceptions.GitlabGetError:
+            region = gitlab_instance.projects.get(project_id).variables.get(
+                key, **{
+                    'filter[environment_scope]': environment
+                }).value
+            return region
+        except gitlab.exceptions.GitlabGetError as e:
             # Variable doesn't exist
-            return ""
-        # The gitlab-python API doesn't appear to support the environment scope filter
-        # base_url = "https://app.dev.unfurl.cloud/api/v4"
-        # private_token = os.getenv("UNFURL_ACCESS_TOKEN")
-        # url = f"{base_url}/projects/{project_id}/variables/{key}?filter[environment_scope]={environment}&private_token={private_token}"
-        # res = requests.get(url)
-        # data = res.json()
-        # return data['value']
+            raise e
 
     def to_json(self) -> str:
         return {
