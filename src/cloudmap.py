@@ -62,7 +62,12 @@ class Root:
             return region
         except gitlab.exceptions.GitlabGetError as e:
             # Variable doesn't exist
-            raise e
+            # raise e
+            
+            # let's just return n/a for now
+            # happens for environments that weren't successfully instantiated
+
+            return "n/a"
 
     def to_json(self) -> str:
         return {
@@ -158,8 +163,12 @@ class Account:
 
     def create_user_from_project_id(self, project_id: int) -> bool:
         project = gitlab_instance.projects.get(project_id).asdict()
-        owner = project['owner']
-        self.name = owner['username']
+
+        owner = project.get('owner')
+        if owner is not None:
+          self.name = owner['username']
+        else:
+          self.name = project['name']
 
         # If the avatar is not set, use the default avatar
         self.avatarUrl = project['avatar_url'] or "https://app.dev.unfurl.cloud/assets/uf-avatar-placeholder-2-0483fbc376bd429dfd21d89a6b14e7fff0895fff8249d940d4434abb2bd9d163.svg"
@@ -304,8 +313,12 @@ def handle(dashboard_url, root=None):
         region = Region(region_name, cloud_provider)
         root.clouds[cloud_provider].add_region(region)
 
-        with open(f'{clone_location}/{path}/deployment.json', 'r') as f:
-            deployment_ensemble = json.load(f)
+        try:
+          with open(f'{clone_location}/{path}/deployment.json', 'r') as f:
+              deployment_ensemble = json.load(f)
+        except:
+          print(f"Could not open deployment.json at {clone_location}/{path}")
+          continue
 
         account = Account(cloud_provider, project_id)
 
