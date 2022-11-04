@@ -317,9 +317,13 @@ def handle(dashboard_url, root=None):
         try:
           with open(f'{clone_location}/{path}/ensemble.json', 'r') as f:
               deployment_ensemble = json.load(f)
-        except:
-          print(f"Could not open deployment.json at {clone_location}/{path}")
-          continue
+
+          with open(f'{clone_location}/{path}/deployment.json', 'r') as f:
+              deployment_ensemble.update(json.load(f))
+        except Exception as e:
+            print("Exception while loading deployment info")
+            print(e)
+            continue
 
         account = Account(cloud_provider, project_id)
 
