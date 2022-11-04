@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import IPython
 from urllib.parse import unquote
 
 from dotenv import load_dotenv
@@ -314,7 +315,7 @@ def handle(dashboard_url, root=None):
         root.clouds[cloud_provider].add_region(region)
 
         try:
-          with open(f'{clone_location}/{path}/deployment.json', 'r') as f:
+          with open(f'{clone_location}/{path}/ensemble.json', 'r') as f:
               deployment_ensemble = json.load(f)
         except:
           print(f"Could not open deployment.json at {clone_location}/{path}")
@@ -324,10 +325,13 @@ def handle(dashboard_url, root=None):
 
         root.clouds[cloud_provider].regions[region_name].add_account(account)
 
-        deployment_name = list(deployment_ensemble['DeploymentTemplate'].keys())[0]
-        deployment_template = deployment_ensemble['DeploymentTemplate'][deployment_name]
-        template_name = deployment_template['title']
-        app = Deployment(deployment_name, dashboard_url, path, template_name, cloud_provider, deployment_ensemble)
+        deployment = deployment_ensemble.get('Deployment')
+        if deployment is None: continue
+
+        deployment_name = list(deployment)[0]
+        deployment_definition = deployment_ensemble['Deployment'][deployment_name]
+        deployent_name = deployment_definition['title']
+        app = Deployment(deployment_name, dashboard_url, path, deployment_name, cloud_provider, deployment_ensemble)
 
         (root
             .clouds[cloud_provider]
@@ -339,19 +343,12 @@ def handle(dashboard_url, root=None):
             .accounts[account.name]
             .add_deployment(app))
 
-        required_templates = deployment_template['resourceTemplates']
-        for resource_name in required_templates:
+        resources = deployment_definition['resources']
+        for resource_name in resources:
             # Where is the definition of the resource?
-            if resource_name in deployment_ensemble['ResourceTemplate']:
+            if resource_name in deployment_ensemble['Resource']:
                 resource_definition = (deployment_ensemble
-                                       ['ResourceTemplate']
-                                       [resource_name])
-
-            elif resource_name in deployment_template['ResourceTemplate']:
-                resource_definition = (deployment_ensemble
-                                       ['DeploymentTemplate']
-                                       [deployment_name]
-                                       ['ResourceTemplate']
+                                       ['Resource']
                                        [resource_name])
 
             # Haven't found have a definition
@@ -359,7 +356,14 @@ def handle(dashboard_url, root=None):
                 print(f"Skipping resource {resource_name}, no definition found")
                 continue
 
-            resource_type = resource_definition['type']
+            if resource_definition.get('visibility') == 'hidden':
+                continue
+
+            resource_template = resource_definition["template"]
+            resource_template = deployment_ensemble["ResourceTemplate"][resource_template]
+
+            resource_type = resource_template['type']
+
             resource = Resource(resource_name, resource_type, cloud_provider)
             (root
                 .clouds[cloud_provider]
